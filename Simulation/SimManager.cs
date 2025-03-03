@@ -1,15 +1,42 @@
+using log4net;
+
 namespace Simulation;
+
+class Recording
+{
+    public int WorkerID;
+    public int Score;
+    public int Seed;
+    public List<Action> Actions;
+
+    public Recording(int workerID, int seed)
+    {
+        WorkerID = workerID;
+        Seed     = seed;
+        Actions  = new List<Action>();
+    }
+}
 
 class SimManager
 {
+    private static readonly ILog s_logger = LogManager.GetLogger(typeof(SimManager));
+
     private Task[] m_tasks;
+
+    private object m_recordedSimsLock      = new object();
+    private List<Recording> m_recordedSims = new List<Recording>();
+
+    public List<Recording> RecordedSims
+    {
+        get { return m_recordedSims; }
+    }
 
     public SimManager(int maxRuns)
     {
         m_tasks = new Task[maxRuns];
     }
 
-    public async Task Run()
+    public void Run()
     {
         for (int i = 0; i < m_tasks.Length; i++)
         {
@@ -17,18 +44,18 @@ class SimManager
             m_tasks[i]   = Task.Run(() => Simulate(workerID));
         }
 
-        await Task.WhenAll(m_tasks);
-        Console.WriteLine("Done All Tasks");
+        Task.WhenAll(m_tasks).Wait();
+
+        s_logger.Info("All Tasks Finished");
     }
 
-    private static void Simulate(int workerID)
+    private void Simulate(int workerID)
     {
-        Console.WriteLine($"Worker {workerID}: Starting simulation");
+        s_logger.Info($"Worker {workerID}: Starting simulation");
 
-        SnakeEngine engine = new SnakeEngine(40, 23);
-
-        Status status = Status.Running;
-        Action action = Action.None;
+        Status status       = Status.Running;
+        SnakeEngine engine  = new SnakeEngine(40, 23);
+        Recording recording = new Recording(workerID, engine.Seed);
 
         Random random = new Random();
 
@@ -36,13 +63,19 @@ class SimManager
         {
             //TODO: get the ai to output an action
             Action[] actions = { Action.None, Action.TurnLeft, Action.TurnRight };
-
-            action = actions[random.Next(0, actions.Length)];
-            //Console.WriteLine($"Worker {workerID}: Doing action {action}");
-
+            Action action    = actions[random.Next(0, actions.Length)];
+            
+            recording.Actions.Add(action);
             status = engine.Step(action);
         }
 
-        Console.WriteLine($"Worker {workerID}: Finished with {status} and score {engine.Score}");
+        recording.Score = engine.Score;
+
+        lock (m_recordedSimsLock)
+        {
+            m_recordedSims.Add(recording);
+        }
+
+        s_logger.Info($"Worker {workerID}: Finished with {status} and score {engine.Score}");
     }
 }

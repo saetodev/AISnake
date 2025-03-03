@@ -29,6 +29,8 @@ class SnakeEngine
 
     private Snake m_snake = new Snake();
 
+    private Random m_random;
+
     public int Score
     {
         get
@@ -43,6 +45,11 @@ class SnakeEngine
         {
             return m_food;
         }
+
+        set
+        {
+            m_food = value;
+        }
     }
 
     public LinkedList<Vector2> SnakeParts
@@ -53,10 +60,27 @@ class SnakeEngine
         }
     }
 
+    public int Seed = Guid.NewGuid().GetHashCode();
+
     public SnakeEngine(int width, int height)
     {
         m_width  = width;
         m_height = height;
+
+        m_random = new Random(Seed);
+
+        m_snake.BodyParts.AddFirst(new Vector2(m_width / 2, m_height / 2));
+
+        SpawnFood();
+    }
+
+    public SnakeEngine(int width, int height, int seed)
+    {
+        m_width  = width;
+        m_height = height;
+
+        Seed     = seed;
+        m_random = new Random(seed);
 
         m_snake.BodyParts.AddFirst(new Vector2(m_width / 2, m_height / 2));
 
@@ -89,12 +113,10 @@ class SnakeEngine
     }
 
     private void SpawnFood() {
-        Random random = new Random();
-
         do
         {
-            m_food.X = random.Next(0, m_width);
-            m_food.Y = random.Next(0, m_height);
+            m_food.X = m_random.Next(0, m_width);
+            m_food.Y = m_random.Next(0, m_height);
         } while (m_snake.HitsBody(m_food));
     }
 
